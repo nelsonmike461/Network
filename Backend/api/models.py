@@ -48,7 +48,7 @@ class Post(models.Model):
     edited = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"Post#{self.id} - {self.poster.username}: {self.content}"
+        return f"Post#{self.id} - {self.poster.username}: {self.tweet}"
 
     class Meta:
         ordering = ["-date_posted"]

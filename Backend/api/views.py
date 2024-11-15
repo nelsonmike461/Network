@@ -14,7 +14,7 @@ from .serializers import (
     PostSerializer,
     CommentSerializer,
 )
-from .models import Post
+from .models import Post, Comment
 from django.contrib.auth import get_user_model
 
 
@@ -144,15 +144,16 @@ class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, username):
-        serialize = PostSerializer
-
         user = get_object_or_404(User, username=username)
 
         followers_count = user.followers.count()
         following_count = user.following.count()
 
         posts = Post.objects.filter(poster=user).order_by("-date_posted")
-        tweets = serialize(posts, many=True).data
+        tweets = PostSerializer(posts, many=True).data
+
+        comments = Comment.objects.filter(commenter=user).order_by("-commented")
+        user_comments = CommentSerializer(comments, many=True).data
 
         is_self_profile = request.user == user
 
@@ -166,6 +167,7 @@ class UserProfileView(APIView):
                 "is_self_profile": is_self_profile,
             },
             "tweets": tweets,
+            "comments": user_comments,
         }
 
         return Response(response_data)
