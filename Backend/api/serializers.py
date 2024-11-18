@@ -22,12 +22,17 @@ class CommentSerializer(serializers.ModelSerializer):
         )  # Return the username of the commenter
 
 
+from rest_framework import serializers
+from .models import Post, Comment
+
+
 class PostSerializer(serializers.ModelSerializer):
-    poster = serializers.SerializerMethodField()  # Field for the poster's username
-    likers = serializers.SerializerMethodField()  # Field for likers' usernames
+    poster = serializers.SerializerMethodField()
+    likers = serializers.SerializerMethodField()
     comments = CommentSerializer(many=True, read_only=True)
     likes_count = serializers.SerializerMethodField()
     comments_count = serializers.SerializerMethodField()
+    is_liked = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -36,6 +41,7 @@ class PostSerializer(serializers.ModelSerializer):
             "tweet",
             "poster",
             "likers",
+            "is_liked",
             "date_posted",
             "edited",
             "comments",
@@ -44,20 +50,22 @@ class PostSerializer(serializers.ModelSerializer):
         ]
 
     def get_poster(self, obj):
-        return (
-            obj.poster.username if obj.poster else None
-        )  # Return the username of the poster
+        return obj.poster.username
 
     def get_likers(self, obj):
-        return [
-            liker.username for liker in obj.likers.all()
-        ]  # Return a list of likers' usernames
+        return [user.username for user in obj.likers.all()]
 
     def get_likes_count(self, obj):
-        return obj.likers.count()  # Count of likers
+        return obj.likers.count()
 
     def get_comments_count(self, obj):
-        return obj.comments.count()  # Count of comments
+        return obj.comments.count()
+
+    def get_is_liked(self, obj):
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            return request.user in obj.likers.all()
+        return False
 
 
 class UserRegisterSerializer(serializers.ModelSerializer):

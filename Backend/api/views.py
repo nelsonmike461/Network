@@ -41,15 +41,19 @@ class HomePageView(APIView):
         except EmptyPage:
             paginated_posts = paginator.page(paginator.num_pages)
 
-        tweets = serialize(paginated_posts, many=True)
+        tweets = serialize(paginated_posts, many=True, context={"request": request})
 
-        most_liked_posts = sorted(posts, key=lambda x: x.likes_count, reverse=True)[:10]
+        most_liked_posts = sorted(posts, key=lambda x: x.likes_count, reverse=True)
         most_commented_posts = sorted(
             posts, key=lambda x: x.comments_count, reverse=True
-        )[:10]
+        )
 
-        most_liked_tweets = serialize(most_liked_posts, many=True)
-        most_commented_tweets = serialize(most_commented_posts, many=True)
+        most_liked_tweets = serialize(
+            most_liked_posts, many=True, context={"request": request}
+        )
+        most_commented_tweets = serialize(
+            most_commented_posts, many=True, context={"request": request}
+        )
 
         response_data = {
             "recent_tweets": tweets.data,
@@ -65,6 +69,17 @@ class HomePageView(APIView):
 
 class TweetView(APIView):
     permission_classes = [IsAuthenticated]
+
+    # Get Tweet Details with Comments
+    def get(self, request, post_id):
+        try:
+            tweet = Post.objects.get(id=post_id)
+            tweet_data = PostSerializer(tweet, context={"request": request}).data
+            return Response(tweet_data)
+        except Post.DoesNotExist:
+            return Response(
+                {"error": "Post not found."}, status=status.HTTP_404_NOT_FOUND
+            )
 
     # Create A New Post #
     def post(self, request):
@@ -150,10 +165,17 @@ class UserProfileView(APIView):
         following_count = user.following.count()
 
         posts = Post.objects.filter(poster=user).order_by("-date_posted")
-        tweets = PostSerializer(posts, many=True).data
+        tweets = PostSerializer(
+            posts, many=True, context={"request": request}
+        ).data  # Added context here
 
         comments = Comment.objects.filter(commenter=user).order_by("-commented")
         user_comments = CommentSerializer(comments, many=True).data
+
+        liked_posts = Post.objects.filter(likers=user).order_by("-date_posted")
+        liked_tweets = PostSerializer(
+            liked_posts, many=True, context={"request": request}
+        ).data  # Added context here
 
         is_self_profile = request.user == user
 
@@ -168,6 +190,7 @@ class UserProfileView(APIView):
             },
             "tweets": tweets,
             "comments": user_comments,
+            "liked_tweets": liked_tweets,
         }
 
         return Response(response_data)

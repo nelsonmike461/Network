@@ -1,42 +1,27 @@
-import React, { useEffect } from "react";
+import React from "react";
+import ReactModal from "react-modal";
 import { FaArrowLeftLong } from "react-icons/fa6";
 
-const Modal = ({ show, onClose, children }) => {
-  useEffect(() => {
-    if (show) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [show]);
-
-  if (!show) {
-    return null;
-  }
-
-  const handleOverlayClick = (e) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
+function Modal({ isOpen, onClose, children }) {
   return (
-    <div
-      className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50"
-      onClick={handleOverlayClick}
+    <ReactModal
+      isOpen={isOpen}
+      onRequestClose={onClose}
+      shouldCloseOnOverlayClick={true}
+      className="bg-white p-4 rounded-md shadow-md w-1/2 max-h-screen overflow-y-scroll scrollbar-hide"
+      overlayClassName="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      contentLabel="tweets Modal"
     >
-      <div className="bg-white p-4 rounded-md shadow-md w-1/2 max-h-screen overflow-y-scroll scrollbar-hide">
-        <button className="text-blue-500 mb-2" onClick={onClose}>
-          <FaArrowLeftLong />
-        </button>
-        {children}
-      </div>
-    </div>
+      <button
+        className="text-blue-500 mb-2"
+        onClick={onClose}
+        aria-label="Close modal"
+      >
+        <FaArrowLeftLong />
+      </button>
+      {children}
+    </ReactModal>
   );
-};
+}
 
 export default Modal;
