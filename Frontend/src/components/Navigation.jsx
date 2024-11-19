@@ -71,7 +71,7 @@ function Navigation() {
               {user && (
                 <button
                   onClick={() => setPostModal(true)}
-                  className="bg-blue-900 text-white rounded-full p-2 font-bold hover:bg-blue-600 transition-colors mt-4 w-full"
+                  className="bg-blue-700 text-white rounded-full p-2 font-bold hover:bg-blue-600 transition-colors mt-4 w-full"
                 >
                   Tweet
                 </button>

@@ -17,13 +17,7 @@ class CommentSerializer(serializers.ModelSerializer):
         fields = ["id", "main_post", "comment", "commenter", "commented"]
 
     def get_commenter(self, obj):
-        return (
-            obj.commenter.username if obj.commenter else None
-        )  # Return the username of the commenter
-
-
-from rest_framework import serializers
-from .models import Post, Comment
+        return obj.commenter.username if obj.commenter else None
 
 
 class PostSerializer(serializers.ModelSerializer):

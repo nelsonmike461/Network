@@ -13,6 +13,7 @@ function Profile() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("tweets");
+  const [isFollowing, setIsFollowing] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -41,6 +42,36 @@ function Profile() {
 
     fetchProfile();
   }, [username, user]);
+
+  const handleFollowToggle = async () => {
+    try {
+      const response = await axios.post(
+        `http://127.0.0.1:8000/api/profile/${profileData.user.username}/`,
+        {},
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authTokens?.access}`,
+          },
+        }
+      );
+
+      setIsFollowing(!isFollowing);
+
+      // Update the followers count
+      setProfileData((prev) => ({
+        ...prev,
+        user: {
+          ...prev.user,
+          followers_count: isFollowing
+            ? prev.user.followers_count - 1
+            : prev.user.followers_count + 1,
+        },
+      }));
+    } catch (error) {
+      console.error("Error toggling follow:", error);
+    }
+  };
 
   const handleTweetUpdate = (updatedTweet) => {
     setProfileData((prevData) => ({
@@ -152,9 +183,23 @@ function Profile() {
                 className="w-24 h-24 rounded-full border-2 border-blue-700 bg-blue-700"
               />
               <div className="flex flex-col space-y-2">
-                <span className="text-2xl font-bold text-gray-900">
-                  {profileData.user.username}
-                </span>
+                <div className="flex items-center  gap-9">
+                  <span className="text-2xl font-bold text-gray-900">
+                    {profileData.user.username}
+                  </span>
+                  {username !== user.username && (
+                    <button
+                      onClick={handleFollowToggle}
+                      className={`px-6 py-1 rounded-full text-sm font-semibold transition-colors ${
+                        isFollowing
+                          ? "bg-gray-200 text-gray-800 hover:bg-gray-300"
+                          : "bg-blue-600 text-white hover:bg-blue-700"
+                      }`}
+                    >
+                      {isFollowing ? "Following" : "Follow"}
+                    </button>
+                  )}
+                </div>
                 <div className="flex space-x-6 text-gray-600">
                   {["following", "followers"].map((type) => (
                     <span key={type} className="flex flex-col">

@@ -49,10 +49,10 @@ class HomePageView(APIView):
         )
 
         most_liked_tweets = serialize(
-            most_liked_posts, many=True, context={"request": request}
+            most_liked_posts[:10], many=True, context={"request": request}
         )
         most_commented_tweets = serialize(
-            most_commented_posts, many=True, context={"request": request}
+            most_commented_posts[:10], many=True, context={"request": request}
         )
 
         response_data = {
@@ -117,23 +117,24 @@ class TweetView(APIView):
 
 # Comment on a Post #
 class CommentView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request, post_id):
-        serialize = CommentSerializer
         try:
-            tweet = Post.objects.get(id=post_id)
+            post = Post.objects.get(id=post_id)
         except Post.DoesNotExist:
             return Response(
                 {"error": "Post not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
-        request.data["main_post"] = tweet.id
-        request.data["commenter"] = request.user.id
+        # Create a new comment instance
+        comment = Comment.objects.create(
+            main_post=post, commenter=request.user, comment=request.data.get("comment")
+        )
 
-        comment = serialize(data=request.data)
-        if comment.is_valid():
-            comment.save()
-            return Response(comment.data, status=status.HTTP_201_CREATED)
-        return Response(comment.errors, status=status.HTTP_400_BAD_REQUEST)
+        # Serialize the created comment
+        serializer = CommentSerializer(comment)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 # Like/Unlike #

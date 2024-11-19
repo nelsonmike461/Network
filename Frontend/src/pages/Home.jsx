@@ -29,8 +29,11 @@ function Home() {
   useEffect(() => {
     fetchData(currentPage);
     document.addEventListener("tweetCreated", handleNewTweet);
+    document.addEventListener("commentAdded", handleNewComment);
+
     return () => {
       document.removeEventListener("tweetCreated", handleNewTweet);
+      document.removeEventListener("commentAdded", handleNewComment);
     };
   }, [currentPage]);
 
@@ -55,6 +58,30 @@ function Home() {
     setTweets((prevTweets) => [event.detail, ...prevTweets]);
   };
 
+  const handleNewComment = (event) => {
+    const { tweetId, updatedTweet } = event.detail;
+
+    // Update tweets list
+    setTweets((prevTweets) =>
+      prevTweets.map((tweet) => (tweet.id === tweetId ? updatedTweet : tweet))
+    );
+
+    // Update most liked tweets
+    setMostLikedTweets((prevTweets) =>
+      prevTweets.map((tweet) => (tweet.id === tweetId ? updatedTweet : tweet))
+    );
+
+    // Update most commented tweets and resort
+    setMostCommentedTweets((prevTweets) => {
+      const updatedTweets = prevTweets.map((tweet) =>
+        tweet.id === tweetId ? updatedTweet : tweet
+      );
+      return [...updatedTweets].sort(
+        (a, b) => b.comments_count - a.comments_count
+      );
+    });
+  };
+
   const updateTweetInList = (tweetList, updatedTweet) =>
     tweetList.map((tweet) =>
       tweet.id === updatedTweet.id ? updatedTweet : tweet
@@ -75,12 +102,6 @@ function Home() {
     }
   };
 
-  const handlePageChange = (pageNumber) => {
-    if (pageNumber !== currentPage) {
-      setCurrentPage(pageNumber);
-    }
-  };
-
   const handlePrevious = () => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
@@ -91,6 +112,10 @@ function Home() {
     if (currentPage < totalPages) {
       setCurrentPage(currentPage + 1);
     }
+  };
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
   };
 
   const renderTweets = (tweetList) => {
