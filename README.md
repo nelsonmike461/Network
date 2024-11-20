@@ -10,11 +10,11 @@ A Twitter-like social network website for making posts and following users.
 
 1.Login, register and Logout users.
 
-- ![Login](./static/Login.gif)
+- ![Login](./static/login.gif)
 
 - ![Register](./static/Register.gif)
 
-- ![Logout](./static/Logout.gif)
+- ![Logout](./static/logout.gif)
 
   2.Homepage: Recent tweets, mostliked, mostcommented tweets with pagination and modal.
 
