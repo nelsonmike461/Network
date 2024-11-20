@@ -1,24 +1,50 @@
 import { useNavigate } from "react-router-dom";
-import { createContext, useState, useEffect } from "react";
+import { createContext, useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [authTokens, setAuthTokens] = useState(() =>
-    localStorage.getItem("authTokens")
-      ? JSON.parse(localStorage.getItem("authTokens"))
-      : null
-  );
-  const [user, setUser] = useState(() =>
-    localStorage.getItem("authTokens")
-      ? jwtDecode(localStorage.getItem("authTokens"))
-      : null
-  );
-  const [loading, setLoading] = useState(true);
+  const [authTokens, setAuthTokens] = useState(() => {
+    const tokens = localStorage.getItem("authTokens");
+    return tokens ? JSON.parse(tokens) : null;
+  });
 
+  const [user, setUser] = useState(() => {
+    const tokens = localStorage.getItem("authTokens");
+    return tokens ? jwtDecode(JSON.parse(tokens).access) : null;
+  });
+
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+
+  // Configure axios defaults for authorization
+  useEffect(() => {
+    if (authTokens) {
+      axios.defaults.headers.common[
+        "Authorization"
+      ] = `Bearer ${authTokens.access}`;
+    } else {
+      delete axios.defaults.headers.common["Authorization"];
+    }
+  }, [authTokens]);
+
+  const updateTokens = useCallback((tokens) => {
+    if (tokens) {
+      localStorage.setItem("authTokens", JSON.stringify(tokens));
+      setAuthTokens(tokens);
+      setUser(jwtDecode(tokens.access));
+      axios.defaults.headers.common[
+        "Authorization"
+      ] = `Bearer ${tokens.access}`;
+    } else {
+      localStorage.removeItem("authTokens");
+      setAuthTokens(null);
+      setUser(null);
+      delete axios.defaults.headers.common["Authorization"];
+    }
+  }, []);
 
   const loginUser = async (e) => {
     e.preventDefault();
@@ -28,11 +54,8 @@ export const AuthProvider = ({ children }) => {
         password: e.target.password.value,
       });
 
-      const data = response.data;
       if (response.status === 200) {
-        setAuthTokens(data);
-        setUser(jwtDecode(data.access));
-        localStorage.setItem("authTokens", JSON.stringify(data));
+        updateTokens(response.data);
         navigate("/");
         return { success: true };
       }
@@ -46,21 +69,17 @@ export const AuthProvider = ({ children }) => {
 
   const registerUser = async (e) => {
     e.preventDefault();
+    const { username, password, confirmation } = e.target;
+
+    if (password.value !== confirmation.value) {
+      return { error: "Passwords do not match" };
+    }
+
     try {
-      const username = e.target.username.value;
-      const password = e.target.password.value;
-      const confirmation = e.target.confirmation.value;
-
-      if (password !== confirmation) {
-        return {
-          error: "Passwords do not match",
-        };
-      }
-
       const response = await axios.post("http://127.0.0.1:8000/api/register/", {
-        username: username,
-        password: password,
-        confirmation: confirmation,
+        username: username.value,
+        password: password.value,
+        confirmation: confirmation.value,
       });
 
       if (response.status === 201) {
@@ -68,61 +87,79 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error("Registration error:", error);
-      if (error.response?.data) {
-        return {
-          error: error.response.data,
-        };
-      }
       return {
-        error: "Registration failed",
+        error: error.response?.data || "Registration failed",
       };
     }
   };
 
-  const logoutUser = () => {
-    setAuthTokens(null);
-    setUser(null);
-    localStorage.removeItem("authTokens");
-    navigate("/");
-  };
+  const logoutUser = useCallback(async () => {
+    try {
+      if (authTokens?.refresh) {
+        await axios.post(
+          "http://127.0.0.1:8000/api/logout/",
+          {
+            refresh: authTokens.refresh,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${authTokens.access}`,
+            },
+          }
+        );
+      }
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      updateTokens(null);
+      navigate("/");
+    }
+  }, [authTokens, updateTokens, navigate]);
 
-  const updateToken = async () => {
+  const updateToken = useCallback(async () => {
+    if (!authTokens?.refresh) return;
+
     try {
       const response = await axios.post(
         "http://127.0.0.1:8000/api/token/refresh/",
         {
-          refresh: authTokens?.refresh,
+          refresh: authTokens.refresh,
         }
       );
 
-      const data = response.data;
       if (response.status === 200) {
-        setAuthTokens(data);
-        setUser(jwtDecode(data.access));
-        localStorage.setItem("authTokens", JSON.stringify(data));
+        const newTokens = {
+          ...authTokens,
+          access: response.data.access,
+        };
+        updateTokens(newTokens);
+      } else {
+        logoutUser();
       }
     } catch (error) {
       console.error("Token refresh error:", error);
       logoutUser();
     }
-  };
+  }, [authTokens, updateTokens, logoutUser]);
 
   useEffect(() => {
     if (loading) {
-      setLoading(false);
+      updateToken();
     }
-  }, [loading]);
 
-  // Set up token refresh interval
-  useEffect(() => {
     const fourMinutes = 1000 * 60 * 4;
-    let interval = setInterval(() => {
+    const interval = setInterval(() => {
       if (authTokens) {
         updateToken();
       }
     }, fourMinutes);
+
     return () => clearInterval(interval);
-  }, [authTokens]);
+  }, [authTokens, loading, updateToken]);
+
+  useEffect(() => {
+    setLoading(false);
+  }, []);
 
   const contextData = {
     user,
@@ -134,7 +171,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={contextData}>
-      {loading ? null : children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 };

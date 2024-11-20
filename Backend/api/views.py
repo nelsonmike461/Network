@@ -67,14 +67,58 @@ class HomePageView(APIView):
         return Response(response_data)
 
 
-class TweetView(APIView):
+class FollowingFeedView(APIView):
     permission_classes = [IsAuthenticated]
 
-    # Get Tweet Details with Comments
+    def get(self, request):
+        following_users = request.user.following.all()
+
+        posts = (
+            Post.objects.filter(poster__in=following_users)
+            .annotate(likes_count=Count("likers"), comments_count=Count("comments"))
+            .order_by("-date_posted")
+        )
+
+        # Pagination
+        page_number = request.query_params.get("page", 1)
+        paginator = Paginator(posts, 10)
+
+        try:
+            paginated_posts = paginator.page(page_number)
+        except PageNotAnInteger:
+            paginated_posts = paginator.page(1)
+        except EmptyPage:
+            paginated_posts = paginator.page(paginator.num_pages)
+
+        # Serialize the posts
+        tweets = PostSerializer(
+            paginated_posts, many=True, context={"request": request}
+        )
+
+        response_data = {
+            "tweets": tweets.data,
+            "total_tweets": paginator.count,
+            "total_pages": paginator.num_pages,
+            "current_page": paginated_posts.number,
+        }
+
+        return Response(response_data)
+
+
+class TweetView(APIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PostSerializer
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return super().get_permissions()
+
+    # details
     def get(self, request, post_id):
         try:
             tweet = Post.objects.get(id=post_id)
-            tweet_data = PostSerializer(tweet, context={"request": request}).data
+            tweet_data = self.serializer_class(tweet, context={"request": request}).data
             return Response(tweet_data)
         except Post.DoesNotExist:
             return Response(
@@ -83,18 +127,16 @@ class TweetView(APIView):
 
     # Create A New Post #
     def post(self, request):
-        serialize = PostSerializer
-
-        post = serialize(data=request.data)
+        post = self.serializer_class(data=request.data)
         if post.is_valid():
             tweet = post.save(poster=request.user)
-            return Response(serialize(tweet).data, status=status.HTTP_201_CREATED)
+            return Response(
+                self.serializer_class(tweet).data, status=status.HTTP_201_CREATED
+            )
         return Response(post.errors, status=status.HTTP_400_BAD_REQUEST)
 
     # Edit Post #
     def put(self, request, post_id):
-        serialize = PostSerializer
-
         try:
             tweet = Post.objects.get(id=post_id)
         except Post.DoesNotExist:
@@ -108,7 +150,7 @@ class TweetView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        tweet_update = serialize(tweet, data=request.data, partial=True)
+        tweet_update = self.serializer_class(tweet, data=request.data, partial=True)
         if tweet_update.is_valid():
             tweet_update.save(edited=True)
             return Response(tweet_update.data)
@@ -161,6 +203,7 @@ class UserProfileView(APIView):
 
     def get(self, request, username):
         user = get_object_or_404(User, username=username)
+        is_following = request.user in user.followers.all()
 
         followers_count = user.followers.count()
         following_count = user.following.count()
@@ -188,6 +231,7 @@ class UserProfileView(APIView):
                 "followers_count": followers_count,
                 "following_count": following_count,
                 "is_self_profile": is_self_profile,
+                "is_following": is_following,
             },
             "tweets": tweets,
             "comments": user_comments,

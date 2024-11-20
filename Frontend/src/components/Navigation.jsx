@@ -4,7 +4,7 @@ import { TbLogout } from "react-icons/tb";
 import LoginModal from "./LoginModal";
 import AuthContext from "../context/AuthProvider";
 import RegisterModal from "./RegisterModal";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import TweetModal from "./TweetModal";
 
 function Navigation() {
@@ -12,12 +12,11 @@ function Navigation() {
   const [registerModal, setRegisterModal] = useState(false);
   const [loginModal, setLoginModal] = useState(false);
   const [postModal, setPostModal] = useState(false);
+  const location = useLocation();
 
-  // Updated to handle new tweet without page reload
   const handlePostModal = (success, newTweet) => {
     setPostModal(false);
     if (success && newTweet) {
-      // Dispatch custom event for tweet creation
       const event = new CustomEvent("tweetCreated", {
         detail: newTweet,
         bubbles: true,
@@ -46,10 +45,33 @@ function Navigation() {
     logoutUser();
   };
 
+  // Helper function to determine if a link is active
+  const isActiveLink = (path) => {
+    if (path === "/") {
+      return location.pathname === "/";
+    }
+    return location.pathname.startsWith(path);
+  };
+
+  // Navigation link component with active state
+  const NavLink = ({ to, children }) => (
+    <li
+      className={`w-full transition-all duration-200 ${
+        isActiveLink(to)
+          ? "border rounded-full border-blue-800 bg-gray-100"
+          : "border rounded-full border-transparent hover:bg-blue-50"
+      }`}
+    >
+      <Link to={to} className="p-2 block text-center w-full rounded-lg">
+        {children}
+      </Link>
+    </li>
+  );
+
   return (
     <nav className="flex flex-col justify-between w-2/12 h-screen text-black p-4 fixed border-r border-gray-400">
       <div>
-        <span className="flex items-center justify-center gap-2 text-blue-900 mb-6 mt-3 ">
+        <span className="flex items-center justify-center gap-2 text-blue-900 mb-6 mt-3">
           <BsGlobe size={25} />
           <h3 className="text-xl font-semibold">Network</h3>
         </span>
@@ -59,37 +81,31 @@ function Navigation() {
               <li className="p-2 bg-gray-200 text-center w-full text-blue-900 font-bold border-t border-b border-blue-900">
                 <a href="#">{user.username}</a>
               </li>
-              <li className="p-2 bg-gray-200 text-center w-full rounded-full shadow">
-                <Link to="/">Home</Link>
-              </li>
-              <li className="p-2 bg-gray-200 text-center w-full rounded-full shadow">
-                <Link to="/profile">Profile</Link>
-              </li>
-              <li className="p-2 bg-gray-200 text-center w-full rounded-full shadow">
-                <Link to="/following">Following</Link>
-              </li>
+              <NavLink to="/">Home</NavLink>
+              <NavLink to="/profile">Profile</NavLink>
+              <NavLink to="/following">Following</NavLink>
               {user && (
                 <button
                   onClick={() => setPostModal(true)}
-                  className="bg-blue-700 text-white rounded-full p-2 font-bold hover:bg-blue-600 transition-colors mt-4 w-full"
+                  className="bg-blue-800 text-white rounded-full border p-2 font-bold hover:bg-gray-100 hover:text-blue-800 hover:border-blue-800 transition-colors mt-4 w-full"
                 >
-                  Tweet
+                  Post
                 </button>
               )}
             </>
           ) : (
             <>
               <li
-                className="p-2 bg-blue-800 text-white text-center w-full rounded-full cursor-pointer"
+                className=" text-center bg-blue-800 text-white rounded-full border p-2 font-bold hover:bg-gray-100 hover:text-blue-800 hover:border-blue-800 transition-colors mt-4 w-full"
                 onClick={openLoginModal}
               >
-                <a href="#">Login</a>
+                Login
               </li>
               <li
-                className="p-2 bg-blue-800 text-white text-center w-full rounded-full cursor-pointer"
+                className=" text-center bg-blue-800 text-white rounded-full border p-2 font-semibold hover:bg-gray-100 hover:text-blue-800 hover:border-blue-800 transition-colors  w-full"
                 onClick={openRegisterModal}
               >
-                <a href="#">Register</a>
+                Register{" "}
               </li>
             </>
           )}

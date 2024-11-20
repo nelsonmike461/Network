@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import axios from "axios";
 import { FaLongArrowAltRight } from "react-icons/fa";
 import {
@@ -14,6 +14,7 @@ import Profile from "./Profile";
 import Following from "./Following";
 import LoginModal from "../components/LoginModal";
 import Details from "../components/Details";
+import AuthContext from "../context/AuthProvider";
 
 function Home() {
   const [tweets, setTweets] = useState([]);
@@ -25,79 +26,80 @@ function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalTweets, setModalTweets] = useState([]);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const { authTokens, user } = useContext(AuthContext);
+
+  const fetchData = async (page) => {
+    try {
+      const config = {
+        headers: authTokens
+          ? {
+              Authorization: `Bearer ${authTokens.access}`,
+            }
+          : {},
+      };
+
+      const response = await axios.get(
+        `http://localhost:8000/api/home?page=${page}`,
+        config
+      );
+      const data = response.data;
+
+      setTweets(data.recent_tweets);
+      setMostLikedTweets(data.most_liked_tweets);
+      setMostCommentedTweets(data.most_commented_tweets);
+      setTotalPages(data.total_pages);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchData(currentPage);
     document.addEventListener("tweetCreated", handleNewTweet);
-    document.addEventListener("commentAdded", handleNewComment);
-
     return () => {
       document.removeEventListener("tweetCreated", handleNewTweet);
-      document.removeEventListener("commentAdded", handleNewComment);
     };
-  }, [currentPage]);
-
-  const fetchData = (page) => {
-    axios
-      .get(`http://localhost:8000/api/home?page=${page}`)
-      .then((response) => {
-        const data = response.data;
-        setTweets(data.recent_tweets);
-        setMostLikedTweets(data.most_liked_tweets);
-        setMostCommentedTweets(data.most_commented_tweets);
-        setTotalPages(data.total_pages);
-        setLoading(false);
-      })
-      .catch((error) => {
-        console.error("There was an error fetching the data!", error);
-        setLoading(false);
-      });
-  };
+  }, [currentPage, authTokens]);
 
   const handleNewTweet = (event) => {
     setTweets((prevTweets) => [event.detail, ...prevTweets]);
   };
 
-  const handleNewComment = (event) => {
-    const { tweetId, updatedTweet } = event.detail;
+  const handleLoginModalClose = () => {
+    setIsLoginModalOpen(false);
+    fetchData(currentPage);
+  };
 
-    // Update tweets list
+  const handleTweetUpdate = (updatedTweet) => {
+    // Update recent tweets
     setTweets((prevTweets) =>
-      prevTweets.map((tweet) => (tweet.id === tweetId ? updatedTweet : tweet))
+      prevTweets.map((tweet) =>
+        tweet.id === updatedTweet.id ? updatedTweet : tweet
+      )
     );
 
     // Update most liked tweets
     setMostLikedTweets((prevTweets) =>
-      prevTweets.map((tweet) => (tweet.id === tweetId ? updatedTweet : tweet))
+      prevTweets.map((tweet) =>
+        tweet.id === updatedTweet.id ? updatedTweet : tweet
+      )
     );
 
-    // Update most commented tweets and resort
-    setMostCommentedTweets((prevTweets) => {
-      const updatedTweets = prevTweets.map((tweet) =>
-        tweet.id === tweetId ? updatedTweet : tweet
-      );
-      return [...updatedTweets].sort(
-        (a, b) => b.comments_count - a.comments_count
-      );
-    });
-  };
-
-  const updateTweetInList = (tweetList, updatedTweet) =>
-    tweetList.map((tweet) =>
-      tweet.id === updatedTweet.id ? updatedTweet : tweet
-    );
-
-  const handleTweetUpdate = (updatedTweet) => {
-    setTweets((prevTweets) => updateTweetInList(prevTweets, updatedTweet));
-    setMostLikedTweets((prevTweets) =>
-      updateTweetInList(prevTweets, updatedTweet)
-    );
+    // Update most commented tweets
     setMostCommentedTweets((prevTweets) =>
-      updateTweetInList(prevTweets, updatedTweet)
+      prevTweets.map((tweet) =>
+        tweet.id === updatedTweet.id ? updatedTweet : tweet
+      )
     );
-    if (modalTweets.length > 0) {
+
+    // Update modal tweets if open
+    if (isModalOpen) {
       setModalTweets((prevTweets) =>
-        updateTweetInList(prevTweets, updatedTweet)
+        prevTweets.map((tweet) =>
+          tweet.id === updatedTweet.id ? updatedTweet : tweet
+        )
       );
     }
   };
@@ -123,8 +125,9 @@ function Home() {
       <Card
         key={tweet.id}
         tweet={tweet}
-        setLoginModalOpen={setIsLoginModalOpen}
         onTweetUpdate={handleTweetUpdate}
+        setLoginModalOpen={setIsLoginModalOpen}
+        isAuthenticated={!!user}
       />
     ));
   };
@@ -132,26 +135,35 @@ function Home() {
   const renderSideSection = (title, tweets, type) => {
     const tweetsToShow = tweets.slice(0, 3);
     return (
-      <div className="p-4 h-1/2">
-        <h2 className="font-bold text-xl mb-4 text-blue-900">{title}</h2>
-        {tweetsToShow.map((tweet) => (
-          <SideCard
-            key={tweet.id}
-            tweet={tweet}
-            type={type}
-            onTweetUpdate={handleTweetUpdate}
-          />
-        ))}
-        {tweets.length > 3 && (
-          <button
-            onClick={() => openModal(tweets)}
-            className="text-blue-700 font-bold text-sm"
-          >
-            <div className="flex items-center space-x-2 mt-5">
-              <span>See More</span> <FaLongArrowAltRight size={18} />
-            </div>
-          </button>
-        )}
+      <div
+        className="h-1/2 overflow-y-scroll scrollbar-hide"
+        style={{ height: "50vh" }}
+      >
+        <h2 className="p-3 font-bold text-l mb-1 text-blue-900 sticky top-0 bg-white">
+          {title}
+        </h2>
+        <div className="p-3">
+          {tweetsToShow.map((tweet) => (
+            <SideCard
+              key={tweet.id}
+              tweet={tweet}
+              type={type}
+              onTweetUpdate={handleTweetUpdate}
+              setLoginModalOpen={setIsLoginModalOpen}
+              isAuthenticated={!!user}
+            />
+          ))}
+          {tweets.length > 3 && (
+            <button
+              onClick={() => openModal(tweets)}
+              className="text-blue-700 font-bold text-sm"
+            >
+              <div className="flex items-center space-x-2 mt-5">
+                <span>See More</span> <FaLongArrowAltRight size={18} />
+              </div>
+            </button>
+          )}
+        </div>
       </div>
     );
   };
@@ -209,12 +221,12 @@ function Home() {
     setIsModalOpen(true);
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-  };
-
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+      </div>
+    );
   }
 
   return (
@@ -250,13 +262,10 @@ function Home() {
           "comments"
         )}
       </aside>
-      <Modal isOpen={isModalOpen} onClose={closeModal}>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         {renderTweets(modalTweets)}
       </Modal>
-      <LoginModal
-        isOpen={isLoginModalOpen}
-        onClose={() => setIsLoginModalOpen(false)}
-      />
+      <LoginModal isOpen={isLoginModalOpen} onClose={handleLoginModalClose} />
     </div>
   );
 }

@@ -8,6 +8,7 @@ from .views import (
     ToggleLikeView,
     CommentView,
     UserProfileView,
+    FollowingFeedView,
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 
@@ -17,6 +18,7 @@ urlpatterns = [
     path(
         "tweet/like-unlike/<int:post_id>/", ToggleLikeView.as_view(), name="like-unlike"
     ),
+    path("following-feed/", FollowingFeedView.as_view(), name="following-feed"),
     path("tweet/<int:post_id>/", TweetView.as_view(), name="tweet_update"),
     path("tweet/", TweetView.as_view(), name="tweet"),
     path("home/", HomePageView.as_view(), name="home"),

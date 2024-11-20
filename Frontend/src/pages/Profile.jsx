@@ -14,6 +14,7 @@ function Profile() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("tweets");
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -29,6 +30,7 @@ function Profile() {
           }
         );
         setProfileData(response.data);
+        setIsFollowing(response.data.user.is_following || false);
         setLoading(false);
       } catch (error) {
         setError(
@@ -44,6 +46,7 @@ function Profile() {
   }, [username, user]);
 
   const handleFollowToggle = async () => {
+    setIsFollowLoading(true);
     try {
       const response = await axios.post(
         `http://127.0.0.1:8000/api/profile/${profileData.user.username}/`,
@@ -56,20 +59,22 @@ function Profile() {
         }
       );
 
-      setIsFollowing(!isFollowing);
-
-      // Update the followers count
-      setProfileData((prev) => ({
-        ...prev,
-        user: {
-          ...prev.user,
-          followers_count: isFollowing
-            ? prev.user.followers_count - 1
-            : prev.user.followers_count + 1,
-        },
-      }));
+      if (response.status === 200 || response.status === 201) {
+        setIsFollowing(!isFollowing);
+        setProfileData((prev) => ({
+          ...prev,
+          user: {
+            ...prev.user,
+            followers_count: isFollowing
+              ? prev.user.followers_count - 1
+              : prev.user.followers_count + 1,
+          },
+        }));
+      }
     } catch (error) {
       console.error("Error toggling follow:", error);
+    } finally {
+      setIsFollowLoading(false);
     }
   };
 
@@ -183,20 +188,39 @@ function Profile() {
                 className="w-24 h-24 rounded-full border-2 border-blue-700 bg-blue-700"
               />
               <div className="flex flex-col space-y-2">
-                <div className="flex items-center  gap-9">
+                <div className="flex items-center gap-6">
                   <span className="text-2xl font-bold text-gray-900">
                     {profileData.user.username}
                   </span>
-                  {username !== user.username && (
+                  {!profileData.user.is_self_profile && (
                     <button
                       onClick={handleFollowToggle}
-                      className={`px-6 py-1 rounded-full text-sm font-semibold transition-colors ${
-                        isFollowing
-                          ? "bg-gray-200 text-gray-800 hover:bg-gray-300"
-                          : "bg-blue-600 text-white hover:bg-blue-700"
-                      }`}
+                      disabled={isFollowLoading}
+                      className={`
+                        px-8 py-1 rounded-full text-sm font-semibold 
+                        transition-all duration-200 relative w-[120px] flex items-center justify-center
+                        ${isFollowLoading ? "cursor-not-allowed" : ""}
+                        ${
+                          isFollowing
+                            ? "bg-blue-200 text-gray-800 hover:bg-red-50 hover:text-red-600 hover:border-red-600 border group"
+                            : "bg-blue-600 text-white hover:bg-blue-700"
+                        }
+                      `}
                     >
-                      {isFollowing ? "Following" : "Follow"}
+                      {isFollowLoading ? (
+                        <div className="h-5 w-5 border-2 border-t-transparent border-current rounded-full animate-spin mx-auto" />
+                      ) : isFollowing ? (
+                        <div className="w-[80px]">
+                          <span className="block group-hover:hidden">
+                            Following
+                          </span>
+                          <span className="hidden group-hover:block">
+                            Unfollow
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="block w-[80px]">Follow</span>
+                      )}
                     </button>
                   )}
                 </div>

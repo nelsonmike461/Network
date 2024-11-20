@@ -41,7 +41,19 @@ function TweetModal({ isOpen, onClose, tweet = null }) {
 
       if (response.status === (isEditing ? 200 : 201)) {
         if (!isEditing) setTweetContent("");
-        onClose(true, response.data);
+        // Merge the response data with existing tweet data
+        const updatedTweet = isEditing
+          ? {
+              ...tweet,
+              ...response.data,
+              is_liked: tweet.is_liked,
+              likes_count: tweet.likes_count,
+              likers: tweet.likers,
+              comments_count: tweet.comments_count,
+              comments: tweet.comments,
+            }
+          : response.data;
+        onClose(true, updatedTweet);
       }
     } catch (error) {
       setError(
