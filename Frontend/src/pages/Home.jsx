@@ -57,6 +57,11 @@ function Home() {
 
   useEffect(() => {
     fetchData(currentPage);
+    // Reset scroll position when page changes
+    const mainContent = document.querySelector("main");
+    if (mainContent) {
+      mainContent.scrollTop = 0;
+    }
     document.addEventListener("tweetCreated", handleNewTweet);
     return () => {
       document.removeEventListener("tweetCreated", handleNewTweet);
@@ -69,7 +74,6 @@ function Home() {
 
   const handleLoginModalClose = () => {
     setIsLoginModalOpen(false);
-    fetchData(currentPage);
   };
 
   const handleTweetUpdate = (updatedTweet) => {
