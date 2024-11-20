@@ -63,14 +63,22 @@ function Home() {
       mainContent.scrollTop = 0;
     }
 
-    const handleTweetUpdateEvent = (event) => handleTweetUpdate(event.detail);
-    
+    const handleTweetUpdateEvent = (event) => {
+      if (event.detail && event.detail.updatedTweet) {
+        handleTweetUpdate(event.detail.updatedTweet);
+      }
+    };
+
     document.addEventListener("tweetCreated", handleNewTweet);
     document.addEventListener("tweetUpdated", handleTweetUpdateEvent);
-    
+    document.addEventListener("likeUpdated", handleTweetUpdateEvent);
+    document.addEventListener("commentAdded", handleTweetUpdateEvent);
+
     return () => {
       document.removeEventListener("tweetCreated", handleNewTweet);
       document.removeEventListener("tweetUpdated", handleTweetUpdateEvent);
+      document.removeEventListener("likeUpdated", handleTweetUpdateEvent);
+      document.removeEventListener("commentAdded", handleTweetUpdateEvent);
     };
   }, [currentPage, authTokens]);
 
@@ -92,26 +100,63 @@ function Home() {
     );
 
     // Update most liked tweets
-    setMostLikedTweets((prevTweets) =>
-      prevTweets.map((tweet) =>
+    setMostLikedTweets((prevTweets) => {
+      const updatedTweets = prevTweets.map((tweet) =>
         tweet.id === updatedTweet.id ? updatedTweet : tweet
-      )
-    );
+      );
+      return [...updatedTweets].sort((a, b) => {
+        const aLikes = a.likes_count || 0;
+        const bLikes = b.likes_count || 0;
+        if (aLikes === bLikes) {
+          return new Date(b.date_posted) - new Date(a.date_posted);
+        }
+        return bLikes - aLikes;
+      });
+    });
 
     // Update most commented tweets
-    setMostCommentedTweets((prevTweets) =>
-      prevTweets.map((tweet) =>
+    setMostCommentedTweets((prevTweets) => {
+      const updatedTweets = prevTweets.map((tweet) =>
         tweet.id === updatedTweet.id ? updatedTweet : tweet
-      )
-    );
+      );
+      return [...updatedTweets].sort((a, b) => {
+        const aComments = a.comments_count || 0;
+        const bComments = b.comments_count || 0;
+        if (aComments === bComments) {
+          return new Date(b.date_posted) - new Date(a.date_posted);
+        }
+        return bComments - aComments;
+      });
+    });
 
     // Update modal tweets if open
     if (isModalOpen) {
-      setModalTweets((prevTweets) =>
-        prevTweets.map((tweet) =>
+      setModalTweets((prevTweets) => {
+        const updatedTweets = prevTweets.map((tweet) =>
           tweet.id === updatedTweet.id ? updatedTweet : tweet
-        )
-      );
+        );
+        // Sort based on current modal view
+        if (modalTweets[0]?.likes_count !== undefined) {
+          return [...updatedTweets].sort((a, b) => {
+            const aLikes = a.likes_count || 0;
+            const bLikes = b.likes_count || 0;
+            if (aLikes === bLikes) {
+              return new Date(b.date_posted) - new Date(a.date_posted);
+            }
+            return bLikes - aLikes;
+          });
+        } else if (modalTweets[0]?.comments_count !== undefined) {
+          return [...updatedTweets].sort((a, b) => {
+            const aComments = a.comments_count || 0;
+            const bComments = b.comments_count || 0;
+            if (aComments === bComments) {
+              return new Date(b.date_posted) - new Date(a.date_posted);
+            }
+            return bComments - aComments;
+          });
+        }
+        return updatedTweets;
+      });
     }
   };
 
@@ -228,7 +273,26 @@ function Home() {
   );
 
   const openModal = (tweets) => {
-    setModalTweets(tweets);
+    // Create a new array and sort it based on the type of tweets
+    const sortedTweets = [...tweets].sort((a, b) => {
+      if (tweets[0]?.likes_count !== undefined) {
+        const aLikes = a.likes_count || 0;
+        const bLikes = b.likes_count || 0;
+        if (aLikes === bLikes) {
+          return new Date(b.date_posted) - new Date(a.date_posted);
+        }
+        return bLikes - aLikes;
+      } else if (tweets[0]?.comments_count !== undefined) {
+        const aComments = a.comments_count || 0;
+        const bComments = b.comments_count || 0;
+        if (aComments === bComments) {
+          return new Date(b.date_posted) - new Date(a.date_posted);
+        }
+        return bComments - aComments;
+      }
+      return 0;
+    });
+    setModalTweets(sortedTweets);
     setIsModalOpen(true);
   };
 

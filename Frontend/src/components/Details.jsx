@@ -67,10 +67,11 @@ function Details() {
 
       setTweet(updatedTweet);
 
+      // Dispatch event for other components
       const commentAddedEvent = new CustomEvent("commentAdded", {
         detail: {
           tweetId: tweet.id,
-          updatedTweet: updatedTweet,
+          updatedTweet,
         },
       });
       document.dispatchEvent(commentAddedEvent);

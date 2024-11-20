@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useState, useCallback } from "react";
 import { FaRegComment, FaRegHeart, FaHeart } from "react-icons/fa";
 import { MdEdit } from "react-icons/md";
 import profileImage from "../assets/Profile.png";
@@ -7,6 +7,9 @@ import { useNavigate } from "react-router-dom";
 import TweetModal from "./TweetModal";
 import CommentModal from "./CommentModal";
 import axios from "axios";
+
+// Constants
+const API_BASE_URL = "http://127.0.0.1:8000/api";
 
 function Card({
   tweet,
@@ -19,38 +22,41 @@ function Card({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
 
-  const formatDate = (dateString) => {
+  // Utility functions
+  const formatDate = useCallback((dateString) => {
     const options = { year: "numeric", month: "short", day: "numeric" };
     return new Date(dateString).toLocaleDateString(undefined, options);
-  };
+  }, []);
 
-  const handleAuthenticatedAction = (action, e) => {
+  const handleAuthenticatedAction = useCallback((action, e) => {
     e.stopPropagation();
     if (!user) {
       setLoginModalOpen(true);
       return;
     }
     action(e);
-  };
+  }, [user, setLoginModalOpen]);
 
-  const handleUsernameClick = (username) => {
+  // Navigation handlers
+  const handleUsernameClick = useCallback((username) => {
     navigate(`/profile/${username}`);
-  };
+  }, [navigate]);
 
-  const handleTweetClick = () => {
+  const handleTweetClick = useCallback(() => {
     navigate(`/tweet/${tweet.id}`);
-  };
+  }, [navigate, tweet.id]);
 
+  // API handlers
   const handleLike = async (e) => {
     e.stopPropagation();
     try {
       const response = await axios.post(
-        `http://127.0.0.1:8000/api/tweet/like-unlike/${tweet.id}/`,
+        `${API_BASE_URL}/tweet/like-unlike/${tweet.id}/`,
         {},
         {
-          headers: {
-            Authorization: `Bearer ${authTokens?.access}`,
-          },
+          headers: authTokens?.access ? {
+            Authorization: `Bearer ${authTokens.access}`,
+          } : {},
         }
       );
 
@@ -58,13 +64,12 @@ function Card({
         const updatedTweet = {
           ...tweet,
           is_liked: response.data.liked,
-          likes_count: response.data.liked
-            ? tweet.likes_count + 1
-            : tweet.likes_count - 1,
+          likes_count: response.data.likes_count,
         };
 
         onTweetUpdate(updatedTweet);
 
+        // Dispatch event for other components
         const likeEvent = new CustomEvent("likeUpdated", {
           detail: {
             tweetId: tweet.id,
@@ -78,17 +83,17 @@ function Card({
     }
   };
 
-  const handleComment = (e) => {
+  const handleComment = useCallback((e) => {
     e.stopPropagation();
     setIsCommentModalOpen(true);
-  };
+  }, []);
 
-  const handleEdit = (e) => {
+  const handleEdit = useCallback((e) => {
     e.stopPropagation();
     setIsEditModalOpen(true);
-  };
+  }, []);
 
-  const handleEditModalClose = (wasSuccessful, updatedTweet) => {
+  const handleEditModalClose = useCallback((wasSuccessful, updatedTweet) => {
     setIsEditModalOpen(false);
     if (wasSuccessful && updatedTweet) {
       // Preserve the like state and comments when updating
@@ -101,9 +106,9 @@ function Card({
       };
       onTweetUpdate(mergedTweet);
     }
-  };
+  }, [tweet, onTweetUpdate]);
 
-  const handleCommentModalClose = (wasSuccessful, newComment) => {
+  const handleCommentModalClose = useCallback((wasSuccessful, newComment) => {
     setIsCommentModalOpen(false);
     try {
       if (wasSuccessful && newComment) {
@@ -131,9 +136,10 @@ function Card({
     } catch (error) {
       console.error("Error updating comment:", error);
     }
-  };
+  }, [tweet, onTweetUpdate]);
 
-  const renderActionButton = ({
+  // UI Components
+  const renderActionButton = useCallback(({
     onClick,
     icon: Icon,
     count,
@@ -148,25 +154,17 @@ function Card({
       <div className="flex items-center">
         <Icon
           className={`mr-1 transform transition-all duration-200 
-            ${
-              hoverColor === "red"
-                ? "group-hover:text-red-500"
-                : "group-hover:text-blue-500"
-            }
+            ${hoverColor === "red" ? "group-hover:text-red-500" : "group-hover:text-blue-500"}
             group-hover:scale-110 active:scale-90`}
         />
         <span
-          className={`${
-            hoverColor === "red"
-              ? "group-hover:text-red-500"
-              : "group-hover:text-blue-500"
-          }`}
+          className={`${hoverColor === "red" ? "group-hover:text-red-500" : "group-hover:text-blue-500"}`}
         >
           {count}
         </span>
       </div>
     </button>
-  );
+  ), [handleAuthenticatedAction]);
 
   return (
     <>

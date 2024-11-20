@@ -27,12 +27,20 @@ class HomePageView(APIView):
     def get(self, request):
         serialize = PostSerializer
 
-        posts = Post.objects.annotate(
-            likes_count=Count("likers"), comments_count=Count("comments")
-        ).order_by("-date_posted")
+        posts = Post.objects.all()
+        most_liked_posts = posts.annotate(like_count=Count("likers")).order_by(
+            "-like_count", "-date_posted"
+        )[:10]
+
+        most_commented_posts = posts.annotate(comment_count=Count("comments")).order_by(
+            "-comment_count", "-date_posted"
+        )[:10]
+
+        # Get recent posts for pagination
+        recent_posts = posts.order_by("-date_posted")
 
         page_number = request.query_params.get("page", 1)
-        paginator = Paginator(posts, 10)
+        paginator = Paginator(recent_posts, 10)
 
         try:
             paginated_posts = paginator.page(page_number)
@@ -41,18 +49,13 @@ class HomePageView(APIView):
         except EmptyPage:
             paginated_posts = paginator.page(paginator.num_pages)
 
+        # Serialize the data
         tweets = serialize(paginated_posts, many=True, context={"request": request})
-
-        most_liked_posts = sorted(posts, key=lambda x: x.likes_count, reverse=True)
-        most_commented_posts = sorted(
-            posts, key=lambda x: x.comments_count, reverse=True
-        )
-
         most_liked_tweets = serialize(
-            most_liked_posts[:10], many=True, context={"request": request}
+            most_liked_posts, many=True, context={"request": request}
         )
         most_commented_tweets = serialize(
-            most_commented_posts[:10], many=True, context={"request": request}
+            most_commented_posts, many=True, context={"request": request}
         )
 
         response_data = {
@@ -181,6 +184,8 @@ class CommentView(APIView):
 
 # Like/Unlike #
 class ToggleLikeView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request, post_id):
         try:
             tweet = Post.objects.get(id=post_id)
@@ -195,7 +200,12 @@ class ToggleLikeView(APIView):
         else:
             tweet.likers.add(request.user)
             liked = True
-        return Response({"success": True, "liked": liked})
+
+        # Get updated tweet data
+        tweet.refresh_from_db()
+        likes_count = tweet.likers.count()
+
+        return Response({"success": True, "liked": liked, "likes_count": likes_count})
 
 
 class UserProfileView(APIView):

@@ -22,9 +22,7 @@ export const AuthProvider = ({ children }) => {
   // Configure axios defaults for authorization
   useEffect(() => {
     if (authTokens) {
-      axios.defaults.headers.common[
-        "Authorization"
-      ] = `Bearer ${authTokens.access}`;
+      axios.defaults.headers.common["Authorization"] = `Bearer ${authTokens.access}`;
     } else {
       delete axios.defaults.headers.common["Authorization"];
     }
@@ -35,9 +33,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("authTokens", JSON.stringify(tokens));
       setAuthTokens(tokens);
       setUser(jwtDecode(tokens.access));
-      axios.defaults.headers.common[
-        "Authorization"
-      ] = `Bearer ${tokens.access}`;
+      axios.defaults.headers.common["Authorization"] = `Bearer ${tokens.access}`;
     } else {
       localStorage.removeItem("authTokens");
       setAuthTokens(null);
@@ -94,12 +90,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logoutUser = useCallback(async () => {
-    // First clear tokens and state
-    updateTokens(null);
-
     try {
       if (authTokens?.refresh) {
-        // Make the logout request after clearing tokens
         await axios.post("http://127.0.0.1:8000/api/logout/", {
           refresh: authTokens.refresh,
         });
@@ -107,59 +99,54 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
+      updateTokens(null);
       navigate("/");
     }
   }, [authTokens, updateTokens, navigate]);
 
   const updateToken = useCallback(async () => {
-    // Don't try to refresh if there are no tokens
-    if (!authTokens?.refresh) return;
+    if (!authTokens?.refresh) return false;
 
     try {
-      const response = await axios.post(
-        "http://127.0.0.1:8000/api/token/refresh/",
-        {
-          refresh: authTokens.refresh,
-        }
-      );
+      const response = await axios.post("http://127.0.0.1:8000/api/token/refresh/", {
+        refresh: authTokens.refresh,
+      });
 
       if (response.status === 200) {
         const newTokens = {
           access: response.data.access,
-          refresh: response.data.refresh, // Make sure to use the new refresh token
+          refresh: response.data.refresh || authTokens.refresh,
         };
         updateTokens(newTokens);
+        return true;
       }
     } catch (error) {
       console.error("Token refresh error:", error);
-      logoutUser();
+      if (error.response?.status === 401) {
+        await logoutUser();
+      }
+      return false;
     }
   }, [authTokens, updateTokens, logoutUser]);
+
+  // Refresh token 5 minutes before it expires
+  const TOKEN_REFRESH_INTERVAL = 25 * 60 * 1000; // 25 minutes
 
   useEffect(() => {
     let intervalId = null;
 
-    const refreshToken = async () => {
-      if (authTokens) {
+    if (authTokens) {
+      intervalId = setInterval(async () => {
         await updateToken();
-      }
-    };
-
-    if (loading) {
-      refreshToken();
+      }, TOKEN_REFRESH_INTERVAL);
     }
-
-    const fourMinutes = 1000 * 60 * 4;
-    intervalId = setInterval(() => {
-      refreshToken();
-    }, fourMinutes);
 
     return () => {
       if (intervalId) {
         clearInterval(intervalId);
       }
     };
-  }, [authTokens, loading, updateToken]);
+  }, [authTokens, updateToken]);
 
   useEffect(() => {
     setLoading(false);
