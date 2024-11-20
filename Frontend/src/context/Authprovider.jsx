@@ -94,29 +94,25 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logoutUser = useCallback(async () => {
+    // First clear tokens and state
+    updateTokens(null);
+
     try {
       if (authTokens?.refresh) {
-        await axios.post(
-          "http://127.0.0.1:8000/api/logout/",
-          {
-            refresh: authTokens.refresh,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${authTokens.access}`,
-            },
-          }
-        );
+        // Make the logout request after clearing tokens
+        await axios.post("http://127.0.0.1:8000/api/logout/", {
+          refresh: authTokens.refresh,
+        });
       }
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
-      updateTokens(null);
       navigate("/");
     }
   }, [authTokens, updateTokens, navigate]);
 
   const updateToken = useCallback(async () => {
+    // Don't try to refresh if there are no tokens
     if (!authTokens?.refresh) return;
 
     try {
@@ -129,12 +125,10 @@ export const AuthProvider = ({ children }) => {
 
       if (response.status === 200) {
         const newTokens = {
-          ...authTokens,
           access: response.data.access,
+          refresh: response.data.refresh, // Make sure to use the new refresh token
         };
         updateTokens(newTokens);
-      } else {
-        logoutUser();
       }
     } catch (error) {
       console.error("Token refresh error:", error);
@@ -143,18 +137,28 @@ export const AuthProvider = ({ children }) => {
   }, [authTokens, updateTokens, logoutUser]);
 
   useEffect(() => {
+    let intervalId = null;
+
+    const refreshToken = async () => {
+      if (authTokens) {
+        await updateToken();
+      }
+    };
+
     if (loading) {
-      updateToken();
+      refreshToken();
     }
 
     const fourMinutes = 1000 * 60 * 4;
-    const interval = setInterval(() => {
-      if (authTokens) {
-        updateToken();
-      }
+    intervalId = setInterval(() => {
+      refreshToken();
     }, fourMinutes);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, [authTokens, loading, updateToken]);
 
   useEffect(() => {

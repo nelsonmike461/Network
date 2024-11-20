@@ -62,9 +62,15 @@ function Home() {
     if (mainContent) {
       mainContent.scrollTop = 0;
     }
+
+    const handleTweetUpdateEvent = (event) => handleTweetUpdate(event.detail);
+    
     document.addEventListener("tweetCreated", handleNewTweet);
+    document.addEventListener("tweetUpdated", handleTweetUpdateEvent);
+    
     return () => {
       document.removeEventListener("tweetCreated", handleNewTweet);
+      document.removeEventListener("tweetUpdated", handleTweetUpdateEvent);
     };
   }, [currentPage, authTokens]);
 
@@ -74,6 +80,7 @@ function Home() {
 
   const handleLoginModalClose = () => {
     setIsLoginModalOpen(false);
+    fetchData(currentPage);
   };
 
   const handleTweetUpdate = (updatedTweet) => {

@@ -64,6 +64,14 @@ function Card({
         };
 
         onTweetUpdate(updatedTweet);
+
+        const likeEvent = new CustomEvent("likeUpdated", {
+          detail: {
+            tweetId: tweet.id,
+            updatedTweet: updatedTweet,
+          },
+        });
+        document.dispatchEvent(likeEvent);
       }
     } catch (error) {
       console.error("Error toggling like:", error);
@@ -134,27 +142,29 @@ function Card({
   }) => (
     <button
       onClick={(e) => handleAuthenticatedAction(onClick, e)}
-      className={`flex items-center space-x-1 text-xs 
+      className={`flex items-center min-w-[60px] text-xs 
         transition-colors group ${additionalClasses}`}
     >
-      <Icon
-        className={`mr-1 transform transition-all duration-200 
-          ${
+      <div className="flex items-center">
+        <Icon
+          className={`mr-1 transform transition-all duration-200 
+            ${
+              hoverColor === "red"
+                ? "group-hover:text-red-500"
+                : "group-hover:text-blue-500"
+            }
+            group-hover:scale-110 active:scale-90`}
+        />
+        <span
+          className={`${
             hoverColor === "red"
               ? "group-hover:text-red-500"
               : "group-hover:text-blue-500"
-          }
-          group-hover:scale-110 active:scale-90`}
-      />
-      <span
-        className={`${
-          hoverColor === "red"
-            ? "group-hover:text-red-500"
-            : "group-hover:text-blue-500"
-        }`}
-      >
-        {count}
-      </span>
+          }`}
+        >
+          {count}
+        </span>
+      </div>
     </button>
   );
 
@@ -197,7 +207,7 @@ function Card({
           <p className="mb-4 text-gray-700 text-sm">{tweet.tweet}</p>
 
           <div className="flex items-center w-full">
-            <div className="flex items-center space-x-16">
+            <div className="flex items-center gap-8">
               {renderActionButton({
                 onClick: handleLike,
                 icon: tweet.is_liked ? FaHeart : FaRegHeart,

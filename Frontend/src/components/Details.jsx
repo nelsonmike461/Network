@@ -16,7 +16,6 @@ function Details() {
   useEffect(() => {
     const fetchTweetDetails = async () => {
       try {
-        // Make the request with optional auth header
         const config = {
           headers: authTokens?.access
             ? { Authorization: `Bearer ${authTokens.access}` }
@@ -43,6 +42,21 @@ function Details() {
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
+  useEffect(() => {
+    const handleLikeUpdate = (event) => {
+      const { tweetId, updatedTweet } = event.detail;
+      if (tweet && tweet.id === parseInt(tweetId)) {
+        setTweet(updatedTweet);
+      }
+    };
+
+    document.addEventListener("likeUpdated", handleLikeUpdate);
+
+    return () => {
+      document.removeEventListener("likeUpdated", handleLikeUpdate);
+    };
+  }, [tweet]);
+
   const handleCommentSubmit = (success, newComment) => {
     if (success && newComment) {
       const updatedTweet = {
@@ -64,7 +78,6 @@ function Details() {
     setIsCommentModalOpen(false);
   };
 
-  // Add handler for authenticated actions
   const handleAuthenticatedAction = (action) => {
     if (!user) {
       setIsLoginModalOpen(true);
@@ -73,53 +86,49 @@ function Details() {
     action();
   };
 
-  // Add handler for login modal close
   const handleLoginModalClose = () => {
     setIsLoginModalOpen(false);
   };
 
-  if (!tweet)
+  if (!tweet) {
     return <div className="text-red text-center">Tweet not found</div>;
+  }
 
   return (
     <div className="flex flex-col h-screen">
       <div className="sticky top-0 z-10 bg-white">
         <Card
           tweet={tweet}
-          onTweetUpdate={setTweet}
+          onTweetUpdate={(updatedTweet) => {
+            setTweet(updatedTweet);
+            // Dispatch a custom event to update the Home component
+            const updateEvent = new CustomEvent("tweetUpdated", {
+              detail: updatedTweet,
+            });
+            document.dispatchEvent(updateEvent);
+          }}
+          setLoginModalOpen={setIsLoginModalOpen}
           isDetailView={true}
-          handleAuthenticatedAction={handleAuthenticatedAction}
         />
       </div>
 
-      {/* Comments Section */}
       <div className="flex flex-col flex-grow overflow-hidden">
         <div className="sticky top-0 z-20 bg-white border-b border-gray-400">
           <div className="flex justify-between items-center px-4 py-3">
             <h2 className="text-l font-bold text-blue-800">
               Comments ({tweet.comments_count})
             </h2>
-            {user ? (
-              <button
-                onClick={() => setIsCommentModalOpen(true)}
-                className="px-4 py-1 bg-blue-800 text-white rounded-full text-sm hover:bg-blue-700 transition-colors"
-              >
-                Add Comment
-              </button>
-            ) : (
-              <button
-                onClick={() =>
-                  handleAuthenticatedAction(() => setIsCommentModalOpen(true))
-                }
-                className="px-4 py-1 bg-blue-800 text-white rounded-full text-sm hover:bg-blue-700 transition-colors"
-              >
-                Login to Comment
-              </button>
-            )}
+            <button
+              onClick={() =>
+                handleAuthenticatedAction(() => setIsCommentModalOpen(true))
+              }
+              className="px-4 py-1 bg-blue-800 text-white rounded-full text-sm hover:bg-blue-700 transition-colors"
+            >
+              {user ? "Add Comment" : "Login to Comment"}
+            </button>
           </div>
         </div>
 
-        {/*Comments List */}
         <div className="flex-grow overflow-y-auto scrollbar-hide">
           {tweet.comments.length > 0 ? (
             <div>
@@ -148,13 +157,11 @@ function Details() {
         </div>
       </div>
 
-      {user && (
-        <CommentModal
-          isOpen={isCommentModalOpen}
-          onClose={handleCommentSubmit}
-          tweetId={tweet.id}
-        />
-      )}
+      <CommentModal
+        isOpen={isCommentModalOpen}
+        onClose={handleCommentSubmit}
+        tweetId={tweet.id}
+      />
 
       <LoginModal isOpen={isLoginModalOpen} onClose={handleLoginModalClose} />
     </div>
